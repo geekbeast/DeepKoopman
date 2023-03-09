@@ -37,11 +37,11 @@ def define_loss(x, y, g_list, weights, biases, params):
 
     # autoencoder loss
     if params['relative_loss']:
-        loss1_denominator = tf.reduce_mean(tf.reduce_mean(tf.square(tf.squeeze(x[0, :, :])), 1)) + denominator_nonzero
+        loss1_denominator = tf.reduce_mean(input_tensor=tf.reduce_mean(input_tensor=tf.square(tf.squeeze(x[0, :, :])), axis=1)) + denominator_nonzero
     else:
-        loss1_denominator = tf.to_double(1.0)
+        loss1_denominator = tf.cast(1.0, dtype=tf.float64)
 
-    mean_squared_error = tf.reduce_mean(tf.reduce_mean(tf.square(y[0] - tf.squeeze(x[0, :, :])), 1))
+    mean_squared_error = tf.reduce_mean(input_tensor=tf.reduce_mean(input_tensor=tf.square(y[0] - tf.squeeze(x[0, :, :])), axis=1))
     loss1 = params['recon_lam'] * tf.truediv(mean_squared_error, loss1_denominator)
 
     # gets dynamics/prediction
@@ -52,11 +52,11 @@ def define_loss(x, y, g_list, weights, biases, params):
             shift = params['shifts'][j]
             if params['relative_loss']:
                 loss2_denominator = tf.reduce_mean(
-                    tf.reduce_mean(tf.square(tf.squeeze(x[shift, :, :])), 1)) + denominator_nonzero
+                    input_tensor=tf.reduce_mean(input_tensor=tf.square(tf.squeeze(x[shift, :, :])), axis=1)) + denominator_nonzero
             else:
-                loss2_denominator = tf.to_double(1.0)
+                loss2_denominator = tf.cast(1.0, dtype=tf.float64)
             loss2 = loss2 + params['recon_lam'] * tf.truediv(
-                tf.reduce_mean(tf.reduce_mean(tf.square(y[j + 1] - tf.squeeze(x[shift, :, :])), 1)), loss2_denominator)
+                tf.reduce_mean(input_tensor=tf.reduce_mean(input_tensor=tf.square(y[j + 1] - tf.squeeze(x[shift, :, :])), axis=1)), loss2_denominator)
         loss2 = loss2 / params['num_shifts']
 
     # K linear
@@ -72,11 +72,11 @@ def define_loss(x, y, g_list, weights, biases, params):
             if (j + 1) in params['shifts_middle']:
                 if params['relative_loss']:
                     loss3_denominator = tf.reduce_mean(
-                        tf.reduce_mean(tf.square(tf.squeeze(g_list[count_shifts_middle + 1])), 1)) + denominator_nonzero
+                        input_tensor=tf.reduce_mean(input_tensor=tf.square(tf.squeeze(g_list[count_shifts_middle + 1])), axis=1)) + denominator_nonzero
                 else:
-                    loss3_denominator = tf.to_double(1.0)
+                    loss3_denominator = tf.cast(1.0, dtype=tf.float64)
                 loss3 = loss3 + params['mid_shift_lam'] * tf.truediv(
-                    tf.reduce_mean(tf.reduce_mean(tf.square(next_step - g_list[count_shifts_middle + 1]), 1)),
+                    tf.reduce_mean(input_tensor=tf.reduce_mean(input_tensor=tf.square(next_step - g_list[count_shifts_middle + 1]), axis=1)),
                     loss3_denominator)
                 count_shifts_middle += 1
             omegas = net.omega_net_apply(params, next_step, weights, biases)
@@ -87,16 +87,16 @@ def define_loss(x, y, g_list, weights, biases, params):
 
     # inf norm on autoencoder error and one prediction step
     if params['relative_loss']:
-        Linf1_den = tf.norm(tf.norm(tf.squeeze(x[0, :, :]), axis=1, ord=np.inf), ord=np.inf) + denominator_nonzero
-        Linf2_den = tf.norm(tf.norm(tf.squeeze(x[1, :, :]), axis=1, ord=np.inf), ord=np.inf) + denominator_nonzero
+        Linf1_den = tf.norm(tensor=tf.norm(tensor=tf.squeeze(x[0, :, :]), axis=1, ord=np.inf), ord=np.inf) + denominator_nonzero
+        Linf2_den = tf.norm(tensor=tf.norm(tensor=tf.squeeze(x[1, :, :]), axis=1, ord=np.inf), ord=np.inf) + denominator_nonzero
     else:
-        Linf1_den = tf.to_double(1.0)
-        Linf2_den = tf.to_double(1.0)
+        Linf1_den = tf.cast(1.0, dtype=tf.float64)
+        Linf2_den = tf.cast(1.0, dtype=tf.float64)
 
     Linf1_penalty = tf.truediv(
-        tf.norm(tf.norm(y[0] - tf.squeeze(x[0, :, :]), axis=1, ord=np.inf), ord=np.inf), Linf1_den)
+        tf.norm(tensor=tf.norm(tensor=y[0] - tf.squeeze(x[0, :, :]), axis=1, ord=np.inf), ord=np.inf), Linf1_den)
     Linf2_penalty = tf.truediv(
-        tf.norm(tf.norm(y[1] - tf.squeeze(x[1, :, :]), axis=1, ord=np.inf), ord=np.inf), Linf2_den)
+        tf.norm(tensor=tf.norm(tensor=y[1] - tf.squeeze(x[1, :, :]), axis=1, ord=np.inf), ord=np.inf), Linf2_den)
     loss_Linf = params['Linf_lam'] * (Linf1_penalty + Linf2_penalty)
 
     loss = loss1 + loss2 + loss3 + loss_Linf
@@ -123,7 +123,8 @@ def define_regularization(params, trainable_var, loss, loss1):
         None
     """
     if params['L1_lam']:
-        l1_regularizer = tf.contrib.layers.l1_regularizer(scale=params['L1_lam'], scope=None)
+        #l1_regularizer = tf.keras.regularizers.l1(l=params['L1_lam'])
+        l1_regularizer = tf.keras.regularizers.L1(l1=params['L1_lam'])
         # TODO: don't include biases? use weights dict instead?
         loss_L1 = tf.contrib.layers.apply_regularization(l1_regularizer, weights_list=trainable_var)
     else:
@@ -160,7 +161,7 @@ def try_net(data_val, params):
     max_shifts_to_stack = helperfns.num_shifts_in_stack(params)
 
     # DEFINE LOSS FUNCTION
-    trainable_var = tf.trainable_variables()
+    trainable_var = tf.compat.v1.trainable_variables()
     loss1, loss2, loss3, loss_Linf, loss = define_loss(x, y, g_list, weights, biases, params)
     loss_L1, loss_L2, regularized_loss, regularized_loss1 = define_regularization(params, trainable_var, loss, loss1)
 
@@ -169,11 +170,11 @@ def try_net(data_val, params):
     optimizer_autoencoder = helperfns.choose_optimizer(params, regularized_loss1, trainable_var)
 
     # LAUNCH GRAPH AND INITIALIZE
-    sess = tf.Session()
-    saver = tf.train.Saver()
+    sess = tf.compat.v1.Session()
+    saver = tf.compat.v1.train.Saver()
 
     # Before starting, initialize the variables.  We will 'run' this first.
-    init = tf.global_variables_initializer()
+    init = tf.compat.v1.global_variables_initializer()
     sess.run(init)
 
     csv_path = params['model_path'].replace('model', 'error')
@@ -282,7 +283,7 @@ def try_net(data_val, params):
     params['time_exp'] = time.time() - start
     saver.restore(sess, params['model_path'])
     helperfns.save_files(sess, csv_path, train_val_error, params, weights, biases)
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
 
 
 def main_exp(params):
