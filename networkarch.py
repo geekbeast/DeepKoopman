@@ -22,24 +22,24 @@ def weight_variable(shape, var_name, distribution='tn', scale=0.1):
     Raises ValueError if distribution is filename but shape of data in file does not match input shape
     """
     if distribution == 'tn':
-        initial = tf.truncated_normal(shape, stddev=scale, dtype=tf.float64)
+        initial = tf.random.truncated_normal(shape, stddev=scale, dtype=tf.float64)
     elif distribution == 'xavier':
         scale = 4 * np.sqrt(6.0 / (shape[0] + shape[1]))
-        initial = tf.random_uniform(shape, minval=-scale, maxval=scale, dtype=tf.float64)
+        initial = tf.random.uniform(shape, minval=-scale, maxval=scale, dtype=tf.float64)
     elif distribution == 'dl':
         # see page 295 of Goodfellow et al's DL book
         # divide by sqrt of m, where m is number of inputs
         scale = 1.0 / np.sqrt(shape[0])
-        initial = tf.random_uniform(shape, minval=-scale, maxval=scale, dtype=tf.float64)
+        initial = tf.random.uniform(shape, minval=-scale, maxval=scale, dtype=tf.float64)
     elif distribution == 'he':
         # from He, et al. ICCV 2015 (referenced in Andrew Ng's class)
         # divide by m, where m is number of inputs
         scale = np.sqrt(2.0 / shape[0])
-        initial = tf.random_normal(shape, mean=0, stddev=scale, dtype=tf.float64)
+        initial = tf.random.normal(shape, mean=0, stddev=scale, dtype=tf.float64)
     elif distribution == 'glorot_bengio':
         # see page 295 of Goodfellow et al's DL book
         scale = np.sqrt(6.0 / (shape[0] + shape[1]))
-        initial = tf.random_uniform(shape, minval=-scale, maxval=scale, dtype=tf.float64)
+        initial = tf.random.uniform(shape, minval=-scale, maxval=scale, dtype=tf.float64)
     else:
         initial = np.loadtxt(distribution, delimiter=',', dtype=np.float64)
         if (initial.shape[0] != shape[0]) or (initial.shape[1] != shape[1]):
@@ -88,7 +88,7 @@ def encoder(widths, dist_weights, dist_biases, scale, num_shifts_max):
     Side effects:
         None
     """
-    x = tf.placeholder(tf.float64, [num_shifts_max + 1, None, widths[0]])
+    x = tf.compat.v1.placeholder(tf.float64, [num_shifts_max + 1, None, widths[0]])
 
     weights = dict()
     biases = dict()
@@ -275,7 +275,7 @@ def varying_multiply(y, omegas, delta_t, num_real, num_complex_pairs):
         ystack = tf.stack([y[:, ind:ind + 2], y[:, ind:ind + 2]], axis=2)  # [None, 2, 2]
         L_stack = form_complex_conjugate_block(omegas[j], delta_t)
         elmtwise_prod = tf.multiply(ystack, L_stack)
-        complex_list.append(tf.reduce_sum(elmtwise_prod, 1))
+        complex_list.append(tf.reduce_sum(input_tensor=elmtwise_prod, axis=1))
 
     if len(complex_list):
         # each element in list output_list is shape [None, 2]
@@ -374,7 +374,7 @@ def omega_net_apply(params, ycoords, weights, biases):
         temp_name = 'OC%d_' % (j + 1)
         ind = 2 * j
         pair_of_columns = ycoords[:, ind:ind + 2]
-        radius_of_pair = tf.reduce_sum(tf.square(pair_of_columns), axis=1, keep_dims=True)
+        radius_of_pair = tf.reduce_sum(input_tensor=tf.square(pair_of_columns), axis=1, keepdims=True)
         omegas.append(
             omega_net_apply_one(params, radius_of_pair, weights, biases, temp_name))
     for j in np.arange(params['num_real']):
